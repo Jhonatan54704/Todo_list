@@ -6,68 +6,53 @@ require("dotenv").config();
 const Task = require("./models/Task");
 
 const app = express();
-const PORT = 3000;
-
 app.use(cors());
 app.use(express.json());
 
-// Conexión a MongoDB
+// Conexión MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB conectado correctamente"))
+  .then(() => console.log("MongoDB conectado"))
   .catch(err => console.error("Error MongoDB:", err));
 
 // Obtener tareas
 app.get("/tasks", async (req, res) => {
-  try {
-    const tasks = await Task.find().sort({ createdAt: -1 });
-    res.json(tasks);
-  } catch {
-    res.status(500).json({ error: "Error al obtener tareas" });
-  }
+  const tasks = await Task.find().sort({ createdAt: -1 });
+  res.json(tasks);
 });
 
 // Crear tarea
 app.post("/tasks", async (req, res) => {
-  try {
-    const { text } = req.body;
-    if (!text) {
-      return res.status(400).json({ error: "Texto requerido" });
-    }
-    const task = await Task.create({ text });
-    res.json(task);
-  } catch {
-    res.status(500).json({ error: "Error al crear tarea" });
-  }
+  const task = new Task({
+    text: req.body.text,
+    priority: req.body.priority,
+    dueDate: req.body.dueDate
+  });
+  await task.save();
+  res.json(task);
+});
+
+// Actualizar estado
+app.put("/tasks/:id", async (req, res) => {
+  const task = await Task.findByIdAndUpdate(
+    req.params.id,
+    { completed: req.body.completed },
+    { new: true }
+  );
+  res.json(task);
 });
 
 // Eliminar tarea
 app.delete("/tasks/:id", async (req, res) => {
-  try {
-    await Task.findByIdAndDelete(req.params.id);
-    res.json({ message: "Tarea eliminada" });
-  } catch {
-    res.status(500).json({ error: "Error al eliminar tarea" });
-  }
+  await Task.findByIdAndDelete(req.params.id);
+  res.json({ message: "Tarea eliminada" });
 });
 
-// Marcar como completada
-app.put("/tasks/:id", async (req, res) => {
-  try {
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      { completed: req.body.completed },
-      { new: true }
-    );
-    res.json(task);
-  } catch {
-    res.status(500).json({ error: "Error al actualizar tarea" });
-  }
-});
-app.get('/', (req, res) => {
-  res.send('Servidor funcionando correctamente 🚀');
+app.get("/", (req, res) => {
+  res.send("API Todo List funcionando 🚀");
 });
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`Servidor corriendo en http://localhost:${PORT}`)
 );

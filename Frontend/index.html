@@ -2,100 +2,196 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Todo List FullStack</title>
+  <title>Gestor de Tareas</title>
+
   <style>
+    * { box-sizing: border-box; }
+
     body {
-      font-family: Arial;
-      background: #f3f3f3;
-      padding: 40px;
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
       display: flex;
       justify-content: center;
+      align-items: center;
     }
-    .container {
-      background: white;
-      padding: 20px;
-      width: 400px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-    input {
+
+    .app {
+      background: #fff;
       width: 100%;
-      padding: 10px;
+      max-width: 480px;
+      padding: 25px;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
       margin-bottom: 15px;
-      border-radius: 8px;
-      border: 1px solid #bbb;
     }
-    button {
-      width: 100%;
+
+    .form input, .form select, .form button {
       padding: 10px;
-      background: #007bff;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    .form button {
+      grid-column: span 2;
+      background: #667eea;
       color: white;
       border: none;
-      border-radius: 8px;
       cursor: pointer;
     }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
     li {
-      background: #eee;
-      margin: 10px 0;
-      padding: 10px;
-      border-radius: 8px;
+      background: #f4f4f4;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
+
+    li.done {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
     .delete {
       color: red;
       cursor: pointer;
-      font-weight: bold;
+      margin-left: 10px;
+    }
+
+    small {
+      color: #555;
+      font-size: 12px;
     }
   </style>
 </head>
+
 <body>
 
-<div class="container">
-  <h2>Todo List FullStack</h2>
-  <input id="taskInput" type="text" placeholder="Nueva tarea..." />
-  <button onclick="addTask()">Agregar</button>
+<div class="app">
+  <h1>🗂 Gestor de Tareas</h1>
+  <p class="subtitle">Organiza por prioridad y tiempo</p>
+
+  <div class="form">
+    <input id="taskInput" placeholder="Nueva tarea" />
+    
+    <select id="priority">
+      <option value="alta">Alta</option>
+      <option value="media" selected>Media</option>
+      <option value="baja">Baja</option>
+    </select>
+
+    <input type="datetime-local" id="dueDate" />
+    <button onclick="addTask()">Agregar tarea</button>
+  </div>
 
   <ul id="taskList"></ul>
 </div>
 
 <script>
-/* 🔹 LOCAL (para pruebas) */
-const API = "http://localhost:3000/tasks";
-
-/* 🔹 PRODUCCIÓN (Netlify + Render)
-const API = "https://tu-backend.onrender.com/tasks";
-*/
+const API = "http://localhost:3000/tasks"; // cambia luego a Render
 
 async function loadTasks() {
   const res = await fetch(API);
   const tasks = await res.json();
   const list = document.getElementById("taskList");
-
   list.innerHTML = "";
+
+  const now = new Date();
+
+  if (tasks.length === 0) {
+    list.innerHTML = "<p>No hay tareas aún 🚀</p>";
+    return;
+  }
+
   tasks.forEach(t => {
     const li = document.createElement("li");
+
+    if (t.completed) li.classList.add("done");
+
+    if (t.dueDate && new Date(t.dueDate) < now && !t.completed) {
+      li.style.borderLeft = "5px solid red";
+    }
+
+    if (t.priority === "alta") li.style.borderLeft = "5px solid #e74c3c";
+    if (t.priority === "media") li.style.borderLeft = "5px solid #f1c40f";
+    if (t.priority === "baja") li.style.borderLeft = "5px solid #2ecc71";
+
     li.innerHTML = `
-      <span>${t.text}</span>
-      <span class="delete" onclick="deleteTask('${t._id}')">✖</span>
+      <div>
+        <strong>${t.text}</strong><br>
+        <small>
+          🎯 ${t.priority.toUpperCase()} |
+          ⏰ ${t.dueDate ? new Date(t.dueDate).toLocaleString() : "Sin fecha"}
+        </small>
+      </div>
+
+      <div>
+        <input type="checkbox"
+          ${t.completed ? "checked" : ""}
+          onchange="toggleTask('${t._id}', this.checked)"
+        />
+        <span class="delete" onclick="deleteTask('${t._id}')">✖</span>
+      </div>
     `;
+
     list.appendChild(li);
   });
 }
 
 async function addTask() {
-  const input = document.getElementById("taskInput");
-  const text = input.value.trim();
+  const text = document.getElementById("taskInput").value.trim();
+  const priority = document.getElementById("priority").value;
+  const dueDate = document.getElementById("dueDate").value;
+
   if (!text) return;
 
   await fetch(API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, priority, dueDate })
   });
 
-  input.value = "";
+  document.getElementById("taskInput").value = "";
+  loadTasks();
+}
+
+async function toggleTask(id, completed) {
+  await fetch(`${API}/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ completed })
+  });
   loadTasks();
 }
 
@@ -104,7 +200,6 @@ async function deleteTask(id) {
   loadTasks();
 }
 
-// Cargar tareas al iniciar
 loadTasks();
 </script>
 
